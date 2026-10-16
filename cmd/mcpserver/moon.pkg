@@ -1,0 +1,7 @@
+import {
+  "walkzzz/moonpot/common" @common,
+  "walkzzz/moonpot/store" @store,
+  "walkzzz/moonpot/mcp" @mcp,
+  "moonbitlang/x/fs" @fs,
+}
+pkgtype(kind: "executable")

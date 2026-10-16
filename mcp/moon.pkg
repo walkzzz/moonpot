@@ -1,0 +1,8 @@
+import {
+  "walkzzz/moonpot/common" @common,
+  "walkzzz/moonpot/store" @store,
+  "walkzzz/moonpot/ai" @ai,
+  "walkzzz/moonpot/skill" @skill,
+  "walkzzz/moonpot/kb" @kb,
+  "moonbitlang/core/json" @json,
+}

@@ -1,0 +1,5 @@
+import {
+  "walkzzz/moonpot/cli" @mcli,
+  "moonbitlang/core/env" @env,
+}
+pkgtype(kind: "executable")

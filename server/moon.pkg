@@ -1,0 +1,17 @@
+import {
+  "walkzzz/moonpot/common" @common,
+  "walkzzz/moonpot/store" @store,
+  "walkzzz/moonpot/ai" @ai,
+  "walkzzz/moonpot/skill" @skill,
+  "walkzzz/moonpot/kb" @kb,
+  "walkzzz/moonpot/mcp" @mcp,
+  "bobzhang/crescent" @crescent,
+  "bobzhang/crescent/websocket" @ws,
+  "moonbitlang/async",
+  "moonbitlang/core/json" @json,
+  "moonbitlang/core/encoding/utf8" @utf8,
+}
+
+pkgtype(kind: "executable")
+
+supported_targets = "-all+native+wasm"

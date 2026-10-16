@@ -1,0 +1,4 @@
+import {
+  "walkzzz/moonpot/common" @common,
+  "moonbitlang/core/json" @json,
+}
