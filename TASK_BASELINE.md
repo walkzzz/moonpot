@@ -9,16 +9,18 @@
 - 负责人：WorkBuddy（执行） / 用户（确认与确权）。
 - 截止时间：2026-10-31（MoonBit 2026 十月黑客松「AI 应用」赛道）。
 - 模块状态：
-  - P2 store ✅ / P3 ai ✅ / P4 skill ✅ / P5 kb ✅ / P6 mcp ✅ / P7 cli ✅ / **P8 server ✅（2026-10-16 全端点 curl 冒烟绿 + WebSocket JSON-RPC 往返 PASS，0 warning/0 error）** / P9 docs+git 待
+  - P2 store ✅ / P3 ai ✅ / P4 skill ✅ / P5 kb ✅ / P6 mcp ✅ / P7 cli ✅ / P8 server ✅ / **P9 docs+git ✅ 全部完成（2026-10-16 README/changelog/roadmap + 自检查绿 + 已推送 GitHub walkzzz/moonpot master，含基线终态提交）**
 - 交付回写（记/锁/回）：
   - ✅ 已交付 P4 skill 模块；下环依赖 P5 kb。
   - ✅ 已交付 P5 kb 模块；下环依赖 P6 mcp。
   - ✅ 已交付 P6 mcp 模块；下环依赖 P7 cli（init/new-project/generate/run-skill/ask/mcp 子命令）。
   - ✅ 已交付 P7 cli 模块（run_cli + 7 子命令 + cmd/cli 可执行）；下环依赖 P8 server（crescent REST + WebSocket）。
   - ✅ 已交付 P8 server（crescent REST 9 端点 + /api/rcp MCP 透传 + /ws WebSocket 桥）；下环依赖 P9 docs+git。
+  - ✅ 已交付 P9（README/changelog/roadmap + .gitignore + 自检查 + 提交并推送 GitHub）；MoonPot v0.1.0 MVP 全环完成，无遗留。
 - 变更记录：
   - 2026-10-15 用户追加全局规则（记/锁/回 + 禁止群聊当决定）。
   - 2026-10-16 重建 P4 skill（跨包结构体字面量受限 → 改用 @common 工厂函数）。
   - 2026-10-16 完成 P7 cli：修复 3 处 raise 4122、Json 只读构造问题、match 多语句 {} 块；selftest [12] 绿。
   - 2026-10-16 完成 P8 server：重写 server/main.mbt（build_app + 9 REST 端点 + WS 桥）。踩坑记录：Event::try_json/HttpRequest::try_json 跨包不可见 → 自写 parse_body（@utf8.decode + @json.parse + @json.from_json）；泛型定义语法是 fn[T] f(...) 而非 fn f[T](...)；Json 枚举只读不可构造。curl 全端点绿 + Node 原生 WebSocket JSON-RPC 往返 PASS。
 ========================================
+  - 2026-10-16 用户确认 remote（github.com/walkzzz/moonpot）并提供 PAT；push 成功（token 仅临时使用未持久化）；修复 refs/remotes 缺目录导致的静默失败，补建 origin/master 跟踪。
