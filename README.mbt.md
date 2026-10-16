@@ -89,10 +89,34 @@ curl -s localhost:4000/api/rpc -d '{"jsonrpc":"2.0","id":1,"method":"moonpot/lis
 - **KB**: bilingual tokenization (ASCII words + CJK single characters), TF bag-of-words vectors, cosine similarity — fully self-contained, no ML runtime needed.
 - **MCP everywhere**: the single `@mcp.handle(store, text)` dispatcher powers the file-transport server, `POST /api/rpc`, and the `/ws` bridge, so MCP clients can attach over any transport.
 
+## Testing
+
+MoonPot ships a two-layer, dependency-free test suite:
+
+```bash
+# Layer 1 — selftest: 20 assertion blocks across every module
+moonrun _build/wasm/debug/build/cmd/selftest/selftest.wasm
+# ALL STORE + AI + SKILL + KB + MCP + CLI TESTS PASSED
+
+# Layer 2 — e2e: boots the real server and exercises all four transports
+bash e2e/run_e2e.sh
+# e2e summary: PASS=24 FAIL=0
+```
+
+The selftest covers boundary inputs (empty/keyword-flood/tiny-canvas prompts),
+generation determinism, a `FakeProvider` swap of the open `AiProvider` trait,
+corrupted-snapshot recovery, the full MCP method matrix with JSON-RPC error
+codes, KB edge cases (empty index, topk bounds, CJK queries), CLI error paths,
+500-shape/Unicode/deep-nesting round-trips and HTML escaping. The e2e suite
+asserts all REST endpoints plus 404/400 bodies, a WebSocket JSON-RPC
+round-trip (Node ≥ 22 native WebSocket), the MCP file-transport server and a
+CLI full chain with snapshot persistence.
+
 ## Docs
 
 - [docs/changelog.md](docs/changelog.md)
 - [docs/roadmap.md](docs/roadmap.md)
+- [docs/long-term-plan.md](docs/long-term-plan.md) — staged plan to v1.0 with acceptance criteria and risk register
 
 ## License
 

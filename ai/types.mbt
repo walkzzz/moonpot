@@ -23,9 +23,10 @@ pub struct GenResult {
 pub extend GenResult with ToJson::{ to_json }
 pub extend GenResult with @json.FromJson::{ from_json }
 
-/// The LLM client interface. `MockProvider` implements it today; an
-/// `OpenAiProvider`/etc. can implement the same contract later.
-pub trait AiProvider {
+/// The LLM client interface. `MockProvider` implements it today; any
+/// external package may add its own provider (OpenAiProvider/etc.) since
+/// the trait is open.
+pub(open) trait AiProvider {
   gen(Self, req : GenRequest) -> GenResult
 }
 
@@ -43,6 +44,15 @@ pub fn gen_request(
   name : String,
 ) -> GenRequest {
   GenRequest::{ prompt, width, height, name }
+}
+
+/// Factory so other packages can build a GenResult (struct literals are
+/// not constructible across packages).
+pub fn gen_result(
+  project : @common.Project,
+  notes : Array[String],
+) -> GenResult {
+  GenResult::{ project, notes }
 }
 
 test "generate dispatches to the provider" {

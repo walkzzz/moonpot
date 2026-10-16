@@ -92,8 +92,13 @@ fn build_design(req : GenRequest) -> (Array[@common.Shape], Array[String]) {
     cursor_y = cursor_y + title_h + gap
   }
 
-  let area_h = req.height - cursor_y - pad
-  let cells = grid_cells(items.length(), req.width - 2.0 * pad, area_h, gap)
+  // Clamp the content area so tiny/odd canvases cannot produce an empty
+  // grid (which would make `cells[i]` index out of bounds below).
+  let area_h0 = req.height - cursor_y - pad
+  let area_h = if area_h0 < 64.0 { 64.0 } else { area_h0 }
+  let area_w0 = req.width - 2.0 * pad
+  let area_w = if area_w0 < 64.0 { 64.0 } else { area_w0 }
+  let cells = grid_cells(items.length(), area_w, area_h, gap)
   for i = 0; i < items.length(); i = i + 1 {
     let it = items[i]
     let cell = cells[i]

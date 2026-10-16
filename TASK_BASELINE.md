@@ -9,7 +9,9 @@
 - 负责人：WorkBuddy（执行） / 用户（确认与确权）。
 - 截止时间：2026-10-31（MoonBit 2026 十月黑客松「AI 应用」赛道）。
 - 模块状态：
-  - P2 store ✅ / P3 ai ✅ / P4 skill ✅ / P5 kb ✅ / P6 mcp ✅ / P7 cli ✅ / P8 server ✅ / **P9 docs+git ✅ 全部完成（2026-10-16 README/changelog/roadmap + 自检查绿 + 已推送 GitHub walkzzz/moonpot master，含基线终态提交）**
+  - P2 store ✅ / P3 ai ✅ / P4 skill ✅ / P5 kb ✅ / P6 mcp ✅ / P7 cli ✅ / P8 server ✅ / P9 docs+git ✅
+  - **T1 全面测试 ✅（2026-10-16 selftest 扩至 20 块全绿 + e2e/run_e2e.sh 四通道 24 断言全绿；修复小画布 grid 越界 panic；AiProvider 改 pub(open)）**
+  - **T2 远期计划 ✅（docs/long-term-plan.md v0.2→v1.0 已交付）**
 - 交付回写（记/锁/回）：
   - ✅ 已交付 P4 skill 模块；下环依赖 P5 kb。
   - ✅ 已交付 P5 kb 模块；下环依赖 P6 mcp。
@@ -17,6 +19,8 @@
   - ✅ 已交付 P7 cli 模块（run_cli + 7 子命令 + cmd/cli 可执行）；下环依赖 P8 server（crescent REST + WebSocket）。
   - ✅ 已交付 P8 server（crescent REST 9 端点 + /api/rcp MCP 透传 + /ws WebSocket 桥）；下环依赖 P9 docs+git。
   - ✅ 已交付 P9（README/changelog/roadmap + .gitignore + 自检查 + 提交并推送 GitHub）；MoonPot v0.1.0 MVP 全环完成，无遗留。
+  - ✅ 已交付 T1 全面测试（selftest [13]-[20] + e2e 24 断言）；下环依赖 T2 远期计划。
+  - ✅ 已交付 T2 远期迭代计划（docs/long-term-plan.md）；测试+计划均已随本轮提交推送。
 - 变更记录：
   - 2026-10-15 用户追加全局规则（记/锁/回 + 禁止群聊当决定）。
   - 2026-10-16 重建 P4 skill（跨包结构体字面量受限 → 改用 @common 工厂函数）。
@@ -24,3 +28,4 @@
   - 2026-10-16 完成 P8 server：重写 server/main.mbt（build_app + 9 REST 端点 + WS 桥）。踩坑记录：Event::try_json/HttpRequest::try_json 跨包不可见 → 自写 parse_body（@utf8.decode + @json.parse + @json.from_json）；泛型定义语法是 fn[T] f(...) 而非 fn f[T](...)；Json 枚举只读不可构造。curl 全端点绿 + Node 原生 WebSocket JSON-RPC 往返 PASS。
 ========================================
   - 2026-10-16 用户确认 remote（github.com/walkzzz/moonpot）并提供 PAT；push 成功（token 仅临时使用未持久化）；修复 refs/remotes 缺目录导致的静默失败，补建 origin/master 跟踪。
+  - 2026-10-16 T1 全面测试：selftest 12→20 块（AI 边界/确定性、FakeProvider、损坏快照容错、MCP 全矩阵错误码、KB CJK/topk、CLI 错误路径、500-shape+Unicode+深嵌套、HTML 转义、技能管线）；发现并修复小画布 grid_cells 空数组越界 panic（内容区钳制 ≥64px）；AiProvider 改 pub(open) 以支持外部 Provider；新增 ai.gen_result 工厂。e2e/run_e2e.sh + ws_client.mjs：REST 13 项 + WS 往返 + MCP 文件传输 + CLI 全链路，PASS=24 FAIL=0。e2e 踩坑：临时目录必须在 repo 内（moonrun 对 E:/Temp 下 cwd 解析 /e/... 失败）；mcpserver demo 文件 id 是 home。T2：docs/long-term-plan.md（v0.2 AI→v0.3 持久化协作→v0.4 生态→v0.5 运维→v1.0 发布，含验收标准与风险登记）。
