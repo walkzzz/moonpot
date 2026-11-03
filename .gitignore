@@ -6,3 +6,6 @@ target
 .moonagent/
 *.log
 mcp_in.jsonl
+
+# e2e scratch dir (run_e2e.sh)
+.e2e_tmp/

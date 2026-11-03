@@ -18,12 +18,12 @@ Penpot proved that open-source design tooling matters. MoonPot re-imagines its b
 | --- | --- | --- |
 | `common` | `common/` | Domain model: projects, files, pages, shapes, colors (JSON round-trippable) |
 | `store` | `store/` | `Store` abstraction: in-memory + JSON file snapshot persistence |
-| `ai` | `ai/` | Prompt → design tree generation (keyword-driven mock provider) + HTML/CSS renderer |
+| `ai` | `ai/` | Prompt → design tree generation (`MockProvider` + OpenAI-compatible `OpenAiCompatProvider`) + HTML/CSS renderer |
 | `skill` | `skill/` | Design-tree transformers: `flatten`, `auto-color`, `tag-all`, `normalize-names` |
 | `kb` | `kb/` | Bilingual tokenizer, bag-of-words embedding, cosine retrieval, RAG context |
 | `mcp` | `mcp/` | JSON-RPC 2.0 dispatcher (`moonpot/list_projects`, `moonpot/read_file`, `moonpot/generate_design`, `moonpot/run_skill`, `moonpot/query_kb`) |
 | `cli` | `cli/` | Native CLI: `init`, `new-project`, `generate`, `run-skill`, `ask`, `mcp`, `help` |
-| `server` | `server/` | crescent REST API (9 endpoints) + MCP-over-HTTP (`POST /api/rpc`) + WebSocket bridge (`/ws`) |
+| `server` | `server/` | crescent REST API (9 endpoints) + MCP-over-HTTP (`POST /api/rpc`) + WebSocket bridges (`/ws` JSON-RPC, `/ws/gen` streaming generate) |
 
 ## Build & Run
 
@@ -74,6 +74,7 @@ moonrun _build/wasm/debug/build/server/server.wasm
 | POST | `/api/kb/query` | RAG retrieval over KB documents |
 | POST | `/api/rpc` | JSON-RPC 2.0 passthrough to the MCP dispatcher |
 | WS | `/ws` | WebSocket bridge: text frames are JSON-RPC requests |
+| WS | `/ws/gen` | Streaming generate: send a generate request, receive `start` → `progress` → `done` frames |
 
 Example:
 
@@ -85,7 +86,8 @@ curl -s localhost:4000/api/rpc -d '{"jsonrpc":"2.0","id":1,"method":"moonpot/lis
 ## Design notes
 
 - **Storage**: `Store` keeps everything in memory and snapshots to a JSON file via `save_as`/`load_from` — fast, portable, and swap-ready for PostgreSQL/Redis.
-- **AI provider**: `AiProvider` trait (`pub(open)`) with a deterministic `MockProvider` (offline, keyword-driven layout). Any package can implement the same trait. `provider_contract` is a shared assertion suite every provider must pass; `generate_safe` validates the generated design and self-heals to `MockProvider` if a real LLM emits malformed output.
+- **AI provider**: `AiProvider` trait (`pub(open)`) with a deterministic `MockProvider` (offline, keyword-driven layout) **and** an OpenAI-compatible `OpenAiCompatProvider`. `OpenAiCompatProvider` builds a standards-compliant `/v1/chat/completions` request and, when `MOONPOT_AI_KEY` is set, calls the endpoint live (with self-heal fallback to `MockProvider`); without a key it degrades to a deterministic offline design so the pipeline never breaks. `provider_contract` is a shared assertion suite every provider must pass; `generate_safe` validates the generated design and self-heals to `MockProvider` if a real LLM emits malformed output.
+- **Streaming**: `/api/generate` is provider-aware (live OpenAI when configured, else Mock). Progressive generation is delivered over **`/ws/gen`** (start → progress → done frames) — true Server-Sent Events are not supported by this crescent build because responses are fully buffered, so WS is the correct progressive channel.
 - **KB**: bilingual tokenization (ASCII words + CJK unigrams **and** bigrams), TF-IDF vectors with smooth IDF weighting, cosine similarity — fully self-contained, no ML runtime needed.
 - **MCP everywhere**: the single `@mcp.handle(store, text)` dispatcher powers the file-transport server, `POST /api/rpc`, and the `/ws` bridge, so MCP clients can attach over any transport.
 
@@ -94,24 +96,28 @@ curl -s localhost:4000/api/rpc -d '{"jsonrpc":"2.0","id":1,"method":"moonpot/lis
 MoonPot ships a two-layer, dependency-free test suite:
 
 ```bash
-# Layer 1 — selftest: 22 assertion blocks across every module
+# Layer 1 — selftest: 24 assertion blocks across every module
 moonrun _build/wasm/debug/build/cmd/selftest/selftest.wasm
 # ALL STORE + AI + SKILL + KB + MCP + CLI TESTS PASSED
 
 # Layer 2 — e2e: boots the real server and exercises all four transports
 bash e2e/run_e2e.sh
-# e2e summary: PASS=24 FAIL=0
+# e2e summary: PASS=25 FAIL=0
 ```
 
 The selftest covers boundary inputs (empty/keyword-flood/tiny-canvas prompts),
 generation determinism, a `FakeProvider` swap of the open `AiProvider` trait,
-the `provider_contract` gate (runs against **both** Mock and Fake), and the
+the `provider_contract` gate (runs against **both** Mock and Fake), the
 `generate_safe` self-heal fallback (a broken provider is healed into a valid
-Mock design). KB coverage includes IDF discrimination, CJK bigram tokenization,
-incremental `add()` order preservation, CJK queries and topk bounds. The e2e
-suite asserts all REST endpoints plus 404/400 bodies, a WebSocket JSON-RPC
-round-trip (Node ≥ 22 native WebSocket), the MCP file-transport server and a
-CLI full chain with snapshot persistence.
+Mock design), and the `OpenAiCompatProvider` contract — offline degrade to a
+valid design (no key) plus a standards-compliant `/chat/completions` request
+shape (url, `Authorization: Bearer` header, `model` + `messages` body). KB
+coverage includes IDF discrimination, CJK bigram tokenization, incremental
+`add()` order preservation, CJK queries and topk bounds. The e2e suite asserts
+all REST endpoints plus 404/400 bodies, a WebSocket JSON-RPC round-trip (Node ≥
+22 native WebSocket), a **`/ws/gen` streaming-generate** round-trip (start →
+progress → done frames), the MCP file-transport server and a CLI full chain
+with snapshot persistence.
 
 ## Docs
 

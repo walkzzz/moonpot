@@ -441,5 +441,32 @@ fn main raise {
   )
   println("[22] generate_safe self-heal ... ok")
 
+  // 23. OpenAiCompatProvider: offline (no key) degrades to a valid design
+  let oai_off = @ai.OpenAiCompatProvider::make("", "", "")
+  assert_false(oai_off.enabled)
+  let oai_res = oai_off.gen(@ai.gen_request("landing", 800.0, 600.0, "OAI"))
+  assert_true(@ai.validate_design(oai_res.project))
+  let mut offline_found = false
+  for n in oai_res.notes {
+    if n.contains("offline") {
+      offline_found = true
+    }
+  }
+  assert_true(offline_found)
+  println("[23] openai provider offline degrade ... ok")
+
+  // 24. OpenAiCompatProvider: build_request produces a standards-compliant body
+  let oai_on = @ai.OpenAiCompatProvider::make("http://x/v1", "k", "m")
+  assert_true(oai_on.enabled)
+  let oreq = oai_on.build_request(@ai.gen_request("hi", 1.0, 1.0, "N"))
+  assert_true(oreq.url.has_suffix("/chat/completions"))
+  assert_eq(oreq.headers.get("Authorization"), Some("Bearer k"))
+  let body_str = oreq.body.to_json().stringify()
+  assert_true(body_str.contains("\"model\":\"m\""))
+  assert_true(body_str.contains("\"messages\""))
+  assert_true(body_str.contains("\"role\":\"system\""))
+  assert_true(body_str.contains("\"role\":\"user\""))
+  println("[24] openai build_request shape ... ok")
+
   println("ALL STORE + AI + SKILL + KB + MCP + CLI TESTS PASSED")
 }

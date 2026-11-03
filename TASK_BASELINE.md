@@ -12,7 +12,7 @@
   - P2 store ✅ / P3 ai ✅ / P4 skill ✅ / P5 kb ✅ / P6 mcp ✅ / P7 cli ✅ / P8 server ✅ / P9 docs+git ✅
   - **T1 全面测试 ✅（2026-10-16 selftest 扩至 20 块全绿 + e2e/run_e2e.sh 四通道 24 断言全绿；修复小画布 grid 越界 panic；AiProvider 改 pub(open)）**
   - **T2 远期计划 ✅（docs/long-term-plan.md v0.2→v1.0 已交付）**
-  - **T3 v0.2 迭代（进行中，2026-11-03）：KB IDF+bigram、Provider 契约套件、结构化输出自愈 generate_safe；selftest 20→22 块、e2e 24 全绿、build 0w0e；OpenAiCompatProvider 与流式生成因密钥/网络留作下一步**
+  - **T3 v0.2 迭代 ✅（2026-11-16 收尾）：KB IDF+bigram、Provider 契约套件、结构化输出自愈 generate_safe、OpenAiCompatProvider（真实 HTTP + 离线降级自愈）、/ws/gen 流式进度帧；selftest 22→24 块、e2e 24→25 全绿、build 0w0e**
 - 交付回写（记/锁/回）：
   - ✅ 已交付 P4 skill 模块；下环依赖 P5 kb。
   - ✅ 已交付 P5 kb 模块；下环依赖 P6 mcp。
@@ -22,7 +22,7 @@
   - ✅ 已交付 P9（README/changelog/roadmap + .gitignore + 自检查 + 提交并推送 GitHub）；MoonPot v0.1.0 MVP 全环完成，无遗留。
   - ✅ 已交付 T1 全面测试（selftest [13]-[20] + e2e 24 断言）；下环依赖 T2 远期计划。
   - ✅ 已交付 T2 远期迭代计划（docs/long-term-plan.md）；测试+计划均已随本轮提交推送。
-  - 🔄 进行中 T3 v0.2 迭代：KB 升级（IDF+CJK bigram）+ Provider 契约套件 + 结构化输出自愈；下环依赖 v0.2 收尾（OpenAiCompatProvider 真实 HTTP + 流式生成 SSE/WS）。
+  - ✅ 已交付 T3 v0.2 收尾（2026-11-16）：OpenAiCompatProvider（build_request 离线验证 + server 经 @crescent.fetch 真实调用 + 失败自愈降级 MockProvider）+ WS /ws/gen 流式进度帧（start→progress→done）；下环依赖 v0.3 持久化协作 或 v0.2 SSE（crescent 全缓冲响应不支持，已记录为框架限制，暂缓）。
 - 变更记录：
   - 2026-10-15 用户追加全局规则（记/锁/回 + 禁止群聊当决定）。
   - 2026-10-16 重建 P4 skill（跨包结构体字面量受限 → 改用 @common 工厂函数）。
@@ -31,3 +31,4 @@
 ========================================
   - 2026-10-16 用户确认 remote（github.com/walkzzz/moonpot）并提供 PAT；push 成功（token 仅临时使用未持久化）；修复 refs/remotes 缺目录导致的静默失败，补建 origin/master 跟踪。
   - 2026-10-16 T1 全面测试：selftest 12→20 块（AI 边界/确定性、FakeProvider、损坏快照容错、MCP 全矩阵错误码、KB CJK/topk、CLI 错误路径、500-shape+Unicode+深嵌套、HTML 转义、技能管线）；发现并修复小画布 grid_cells 空数组越界 panic（内容区钳制 ≥64px）；AiProvider 改 pub(open) 以支持外部 Provider；新增 ai.gen_result 工厂。e2e/run_e2e.sh + ws_client.mjs：REST 13 项 + WS 往返 + MCP 文件传输 + CLI 全链路，PASS=24 FAIL=0。e2e 踩坑：临时目录必须在 repo 内（moonrun 对 E:/Temp 下 cwd 解析 /e/... 失败）；mcpserver demo 文件 id 是 home。T2：docs/long-term-plan.md（v0.2 AI→v0.3 持久化协作→v0.4 生态→v0.5 运维→v1.0 发布，含验收标准与风险登记）。
+  - 2026-11-16 T3 收尾：新增 ai/openai.mbt（OpenAiCompatProvider + OpenAiRequest + build_request 离线构造 + 离线降级 gen + pub impl + 4 inline test）；server 增 @crescent.fetch/@env 依赖、read_ai_config（MOONPOT_AI_KEY/BASE_URL/MODEL）、provider-aware /api/generate（真实调用 + openai_to_result 自愈）、/ws/gen 流式进度帧、版本 0.2.0；selftest 块 [23][24]；e2e 新增 ws_gen_client.mjs + /ws/gen 通道（PASS=25）；docs（changelog v0.2.0 / long-term-plan / README / TASK_BASELINE）。踩坑：多行字符串 `+` 须置于行尾、Json::Object 只读不可构造（保留已解析 Json）、Array::push 原地改返回 Unit（let 无需 mut）、变量 mut 仅用于重绑。

@@ -33,6 +33,7 @@ mkdir -p "$TMP"
 cd "$TMP"
 # wasm paths are relative to $TMP (one level up is the repo root)
 WS_MJS="$(cygpath -m "$ROOT/e2e/ws_client.mjs" 2>/dev/null || echo "$ROOT/e2e/ws_client.mjs")"
+WSGEN_MJS="$(cygpath -m "$ROOT/e2e/ws_gen_client.mjs" 2>/dev/null || echo "$ROOT/e2e/ws_gen_client.mjs")"
 
 echo "== [e2e 1/4] REST + WebSocket server =="
 
@@ -88,6 +89,9 @@ assert_contains "400 invalid json" "$B400" '"error"'
 
 WS_OUT=$("$NODE_BIN" "$WS_MJS" 2>&1 | tail -1)
 assert_contains "WS /ws json-rpc round-trip" "$WS_OUT" "WS-PASS"
+
+WSGEN_OUT=$("$NODE_BIN" "$WSGEN_MJS" 2>&1 | tail -1)
+assert_contains "WS /ws/gen streaming generate" "$WSGEN_OUT" "WSGEN-PASS"
 
 kill "$SERVER_PID" 2>/dev/null
 for _ in $(seq 1 10); do

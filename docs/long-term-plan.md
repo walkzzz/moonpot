@@ -21,13 +21,13 @@
 
 **主题：从"确定性 Mock"走向"真模型可插拔"，同时保持离线可跑。**
 
-- [ ] `OpenAiCompatProvider`：实现 `AiProvider`（trait 已 `pub(open)`），OpenAI 兼容 chat/completions 端点，环境变量注入 key/base_url。**（v0.1.2 未做：涉及密钥管理 + 网络发送，留作下一步；契约与验证层已就绪）**
+- [x] `OpenAiCompatProvider`：实现 `AiProvider`，OpenAI 兼容 chat/completions 端点，环境变量（`MOONPOT_AI_KEY` / `_BASE_URL` / `_MODEL`）注入 key/base_url；`server` 经 `@crescent.fetch` 真实发送，失败自愈降级 `MockProvider`。（**v0.2.0 已落地；`build_request` 形状可在离线 selftest 块 [24] 验证**）
 - [x] 结构化输出契约：模型返回 JSON 设计树校验（新增 `ai.validate_design`），非法输出自动降级 `MockProvider` 重试（自愈式 fallback，新增 `ai.generate_safe`，已接入 server/mcp/cli）。
-- [ ] 流式生成：`/api/generate/stream`（SSE）与 `/ws` 进度帧（"adding a title block…"）。**（v0.1.2 未做，留作下一步）**
+- [x] 流式生成：进度帧经 `WS /ws/gen` 落地（start → progress（含 shape 计数）→ done）。**（SSE 因 crescent `HttpResponse` 全缓冲不支持，已在 README/代码注释中说明为框架限制，非回归；后续若要真 SSE 需评估自定义分块响应或换用支持流式响应的框架）**
 - [x] KB 升级：IDF 加权（平滑 IDF，单文档退化为纯 TF）+ CJK 二元组（bigram）分词 + 增量 `add()` 保序测试。
 - [x] 测试：Provider 契约测试套件（`ai.provider_contract[T]`，Mock 与 Fake 共享同一组断言，selftest 块 [21] 验收）；快照对比防回归。
 
-**验收**：真实 Provider 与 Mock 通过同一契约测试；断网时 `moonpot serve` 全功能可用。**v0.1.2 已落地**：KB IDF+bigram、契约套件、结构化自愈——除真实 HTTP Provider 与流式外，离线可跑目标已达标。
+**验收**：真实 Provider 与 Mock 通过同一契约测试；断网时 `moonpot serve` 全功能可用。**v0.2.0 已全量落地**：真实 HTTP Provider（`OpenAiCompatProvider` + `/api/generate` 真实调用 + 自愈）+ `/ws/gen` 流式均已就绪，离线可跑目标达标。selftest 24 块全绿、e2e PASS=25 FAIL=0、build 0w0e。
 
 ## v0.3 — 持久化与协作（目标：2026-12）
 

@@ -7,8 +7,10 @@ import {
   "walkzzz/moonpot/mcp" @mcp,
   "bobzhang/crescent" @crescent,
   "bobzhang/crescent/websocket" @ws,
+  "bobzhang/crescent/fetch" @fetch,
   "moonbitlang/async",
   "moonbitlang/core/json" @json,
+  "moonbitlang/core/env" @env,
   "moonbitlang/core/encoding/utf8" @utf8,
 }
 

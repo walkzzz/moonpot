@@ -2,6 +2,41 @@
 
 All notable changes to MoonPot are documented here.
 
+## [0.2.0] — 2026-11-16
+
+### Added (v0.2 completion — provider + streaming)
+
+- **`OpenAiCompatProvider`** (`ai/openai.mbt`) — an OpenAI-compatible
+  `AiProvider` implementation. `build_request` produces a standards-compliant
+  `/v1/chat/completions` payload (system + user messages, `json_object`
+  response format, `Bearer` auth); `make(base_url, api_key, model)` defaults
+  to the OpenAI endpoint / `gpt-4o-mini` and is `enabled` iff a key is supplied.
+  The live HTTP call (via `@crescent.fetch`) lives in the server; without a key
+  the provider degrades to a deterministic offline design so the pipeline never
+  breaks.
+- **Provider-aware `/api/generate`** — when `MOONPOT_AI_KEY` (and optionally
+  `MOONPOT_AI_BASE_URL` / `MOONPOT_AI_MODEL`) is set, the route calls the
+  OpenAI-compatible endpoint live and maps the response back into a design tree;
+  any network / parse / shape error self-heals to `MockProvider` (consistent
+  with the v0.2 structured-output contract).
+- **Streaming generate over WebSocket** — new `WS /ws/gen` endpoint streams
+  `start` → `progress` (with shape count) → `done` (project + notes) frames.
+  True Server-Sent Events are **not** supported by this crescent build because
+  `HttpResponse` is fully buffered, so progressive generation is delivered over
+  WS instead (documented limitation, not a regression).
+
+### Changed
+
+- `server` adds `bobzhang/crescent/fetch` and `moonbitlang/core/env` deps;
+  service `InfoBody` version bumped to `0.2.0`.
+- `OpenAiCompatProvider` uses `pub impl AiProvider` and exposes `build_request`
+  so the request shape is testable fully offline (no network, no env).
+
+### Quality gate
+
+- `moon build` 0 warnings / 0 errors; selftest **24 blocks** all green;
+  `e2e/run_e2e.sh` **PASS=25 FAIL=0** (added `/ws/gen` streaming channel).
+
 ## [0.1.2] — 2026-11-03
 
 ### Added (v0.2 iteration start — AI upgrade)

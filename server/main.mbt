@@ -12,6 +12,13 @@
 ///   POST /api/kb/query                         RAG retrieve over KB docs
 ///   POST /api/rpc                              JSON-RPC 2.0 passthrough (MCP)
 ///   WS   /ws                                   WebSocket bridge to the MCP dispatcher
+///   WS   /ws/gen                               streaming generate (start/progress/done frames)
+///
+/// NOTE: `/api/generate` is provider-aware — when `MOONPOT_AI_KEY` is set it
+/// calls an OpenAI-compatible endpoint live (with self-heal fallback);
+/// otherwise it uses the deterministic Mock provider. True Server-Sent Events
+/// are not supported by this crescent build (responses are fully buffered),
+/// so progressive generation is delivered over `/ws/gen` instead.
 ///
 /// NOTE: the builtin `Json` enum is read-only (constructors unusable), so all
 /// JSON responses go through `derive(ToJson)` payload structs + `.json_value`.
@@ -115,6 +122,130 @@ fn[T : @json.FromJson] parse_body(event : @crescent.Event) -> Result[T, String] 
   }
 }
 
+/// ---- provider + streaming helpers ----
+
+/// Read the AI provider configuration from the environment.
+/// `MOONPOT_AI_KEY` enables the OpenAI-compatible live provider;
+/// `MOONPOT_AI_BASE_URL` and `MOONPOT_AI_MODEL` are optional.
+fn read_ai_config() -> @ai.OpenAiCompatProvider {
+  match @env.get_env_var("MOONPOT_AI_KEY") {
+    Some(k) => {
+      let base = match @env.get_env_var("MOONPOT_AI_BASE_URL") {
+        Some(b) => b
+        None => ""
+      }
+      let model = match @env.get_env_var("MOONPOT_AI_MODEL") {
+        Some(m) => m
+        None => ""
+      }
+      @ai.OpenAiCompatProvider::make(base, k, model)
+    }
+    None => @ai.OpenAiCompatProvider::make("", "", "")
+  }
+}
+
+/// Map a live OpenAI-compatible HTTP response to a `GenResult`.
+/// Any network/parse/mapping failure self-heals to the deterministic Mock
+/// provider so the pipeline never breaks.
+fn openai_to_result(
+  resp : @crescent.HttpResponse,
+  req : @ai.GenRequest,
+) -> @ai.GenResult {
+  let fallback = @ai.generate_safe(@ai.MockProvider::new(), req)
+  let notes = fallback.notes
+  notes.push("openai: live call failed/unparsable; fell back to mock")
+  let fallback_res = @ai.gen_result(fallback.project, notes)
+  try {
+    let text : String = resp.read_body()
+    match @json.parse(text) {
+      Json::Object(m) => {
+        match m.get("choices") {
+          Some(Json::Array(choices)) => {
+            if choices.length() == 0 {
+              return fallback_res
+            }
+            match choices[0] {
+              Json::Object(c) => {
+                match c.get("message") {
+                  Some(Json::Object(msg)) => {
+                    match msg.get("content") {
+                      Some(Json::String(content)) => {
+                        let parsed : Json = @json.parse(content)
+                        match parsed {
+                          Json::Object(m) => {
+                            match m.get("files") {
+                              Some(_) => {
+                                let proj : @common.Project =
+                                  @json.from_json(parsed)
+                                if @ai.validate_design(proj) {
+                                  return @ai.gen_result(
+                                    proj,
+                                    [
+                                      "provider: openai-compat (live)",
+                                      "model: " + req.name,
+                                    ],
+                                  )
+                                }
+                                return fallback_res
+                              }
+                              None => return fallback_res
+                            }
+                          }
+                          _ => return fallback_res
+                        }
+                      }
+                      _ => return fallback_res
+                    }
+                  }
+                  _ => return fallback_res
+                }
+              }
+              _ => return fallback_res
+            }
+          }
+          _ => return fallback_res
+        }
+      }
+      _ => return fallback_res
+    }
+  } catch {
+    _ => return fallback_res
+  }
+}
+
+/// WebSocket /ws/gen request payload (best-effort parsed from JSON).
+struct WSGenReq {
+  prompt : String
+  width : Double?
+  height : Double?
+  name : String?
+} derive(FromJson)
+
+/// Parse a /ws/gen text frame into a GenRequest, defaulting on any error.
+fn parse_ws_gen(text : String) -> @ai.GenRequest {
+  try {
+    let j = @json.parse(text)
+    let w : WSGenReq = @json.from_json(j)
+    @ai.gen_request(
+      w.prompt,
+      match w.width {
+        Some(x) => x
+        None => 800.0
+      },
+      match w.height {
+        Some(y) => y
+        None => 600.0
+      },
+      match w.name {
+        Some(n) => n
+        None => "WSGen"
+      },
+    )
+  } catch {
+    _ => @ai.gen_request("landing page", 800.0, 600.0, "WSGen")
+  }
+}
+
 /// ---- app builder ----
 
 /// Build the MoonPot REST + WebSocket app over the given store.
@@ -127,18 +258,19 @@ pub fn build_app(store : @store.Store) -> @crescent.App {
       json_ok(
         InfoBody::{
           name: "moonpot",
-          version: "0.1.0",
+          version: "0.2.0",
           description: "Penpot ported to MoonBit with AI / Skill / MCP / CLI / KB",
           endpoints: [
             "GET /health",
             "GET /api/projects",
             "GET /api/projects/:pid/files/:fid",
             "GET /api/skills",
-            "POST /api/generate",
+            "POST /api/generate (provider-aware: OpenAI if MOONPOT_AI_KEY set)",
             "POST /api/projects/:pid/files/:fid/skills/:name",
             "POST /api/kb/query",
             "POST /api/rpc",
             "WS /ws",
+            "WS /ws/gen (streaming generate)",
           ],
         },
       ),
@@ -164,7 +296,7 @@ pub fn build_app(store : @store.Store) -> @crescent.App {
     "/api/skills",
     _ => json_ok(SkillsBody::{ skills: @skill.list_skills() }),
   )
-  // AI generate (deterministic mock provider)
+  // AI generate (provider-aware: OpenAI-compatible if MOONPOT_AI_KEY set)
   app.post("/api/generate", event => {
     let parsed : Result[GenerateRequestBody, String] = parse_body(event)
     match parsed {
@@ -185,7 +317,15 @@ pub fn build_app(store : @store.Store) -> @crescent.App {
           },
           name,
         )
-        let res = @ai.generate_safe(@ai.MockProvider::new(), req)
+        let cfg = read_ai_config()
+        let res = if cfg.enabled {
+          let r = cfg.build_request(req)
+          let body_str = r.body.stringify()
+          let resp = @fetch.post(r.url, data=body_str, headers=r.headers)
+          openai_to_result(resp, req)
+        } else {
+          @ai.generate_safe(@ai.MockProvider::new(), req)
+        }
         let pid = "proj_gen_" + name
         store.create_project(@common.project(pid, name))
         ignore(store.put_file(pid, res.project.files[0]))
@@ -266,6 +406,40 @@ pub fn build_app(store : @store.Store) -> @crescent.App {
           match msg {
             @ws.Text(text) => peer.text(@mcp.handle(store, text))
             @ws.Binary(_) => peer.text("binary frames unsupported; send JSON text")
+          }
+        @ws.Close(_) => ()
+      }
+    }),
+  )
+  // Streaming generate: client sends a JSON generate request, server pushes
+  // progressive frames (start -> progress -> done). Delivered over WS because
+  // this crescent build buffers full HTTP responses (no SSE/chunked push).
+  app.ws(
+    "/ws/gen",
+    @ws.WebSocketHandler(fn(ev) {
+      match ev {
+        @ws.Open(peer) =>
+          peer.text("{\"type\":\"ready\",\"endpoint\":\"/ws/gen\"}")
+        @ws.Message(peer, msg) =>
+          match msg {
+            @ws.Text(text) => {
+              let req = parse_ws_gen(text)
+              peer.text("{\"type\":\"start\"}")
+              let res = @ai.generate_safe(@ai.MockProvider::new(), req)
+              let n = @common.count_shapes(res.project.files[0])
+              let progress = "{\"type\":\"progress\",\"stage\":\"layout\",\"shapes\":" +
+                n.to_string() +
+                "}"
+              peer.text(progress)
+              let done = "{\"type\":\"done\",\"project\":" +
+                Json(res.project).stringify() +
+                ",\"notes\":" +
+                Json(res.notes).stringify() +
+                "}"
+              peer.text(done)
+            }
+            @ws.Binary(_) =>
+              peer.text("binary frames unsupported; send JSON text")
           }
         @ws.Close(_) => ()
       }
