@@ -150,7 +150,7 @@ pub fn run_cli(args : Array[String]) -> Int {
       None => "Generated"
     }
     let req = @ai.gen_request(prompt, width, height, name)
-    let res = @ai.MockProvider::new().gen(req)
+    let res = @ai.generate_safe(@ai.MockProvider::new(), req)
     let s = load_or_new(store_path)
     let pid = "proj_gen_" + name
     s.create_project(@common.project(pid, name))

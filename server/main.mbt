@@ -185,7 +185,7 @@ pub fn build_app(store : @store.Store) -> @crescent.App {
           },
           name,
         )
-        let res = @ai.MockProvider::new().gen(req)
+        let res = @ai.generate_safe(@ai.MockProvider::new(), req)
         let pid = "proj_gen_" + name
         store.create_project(@common.project(pid, name))
         ignore(store.put_file(pid, res.project.files[0]))

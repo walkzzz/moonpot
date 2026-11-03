@@ -2,6 +2,36 @@
 
 All notable changes to MoonPot are documented here.
 
+## [0.1.2] — 2026-11-03
+
+### Added (v0.2 iteration start — AI upgrade)
+
+- **KB upgrade** — TF → **TF-IDF** with smooth IDF weighting (single-doc KBs
+  degrade to pure TF, no zero-vector degeneration); **CJK bigram** tokenization
+  (e.g. `世界` → `世`,`界`,`世界`) for higher retrieval precision.
+- **Provider contract suite** — `ai.provider_contract[T]` runs one shared set
+  of assertions (determinism, JSON round-trip, shape bounds, non-empty notes)
+  against **any** `AiProvider`; the selftest exercises it on both `MockProvider`
+  and a local `FakeProvider`.
+- **Structured-output contract + self-heal** — `ai.validate_design` checks a
+  generated tree is renderable; `ai.generate_safe` falls back to `MockProvider`
+  when a provider returns malformed output, so the pipeline never breaks. Wired
+  into `server`, `mcp` and `cli`.
+- **KB tests** — IDF discrimination, CJK bigram emission, incremental `add()`
+  order preservation.
+
+### Changed
+
+- `MockProvider`'s `impl AiProvider` is now `pub impl` so the generic
+  `generate_safe`/`provider_contract` can be instantiated with it cross-package.
+- `mcp` `list_projects` response uses `Json(arr)` instead of the deprecated
+  `Array::to_json`.
+
+### Quality gate
+
+- `moon build` 0 warnings / 0 errors; selftest **22 blocks** all green;
+  `e2e/run_e2e.sh` **PASS=24 FAIL=0**.
+
 ## [0.1.1] — 2026-10-16
 
 ### Added

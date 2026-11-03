@@ -158,7 +158,7 @@ fn dispatch(
   params : Json,
 ) -> String {
   if mthd == "moonpot/list_projects" {
-    return ok_response(id, store.list_projects().to_json())
+    return ok_response(id, Json(store.list_projects()))
   } else if mthd == "moonpot/read_file" {
     let pid = str_field(params, "project_id")
     let fid = str_field(params, "file_id")
@@ -172,7 +172,7 @@ fn dispatch(
     let height = num_field(params, "height")
     let name = str_field(params, "name")
     let req = @ai.gen_request(prompt, width, height, name)
-    let res = @ai.MockProvider::new().gen(req)
+    let res = @ai.generate_safe(@ai.MockProvider::new(), req)
     return ok_response(id, res.project.to_json())
   } else if mthd == "moonpot/run_skill" {
     let pid = str_field(params, "project_id")

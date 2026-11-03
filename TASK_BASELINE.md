@@ -12,6 +12,7 @@
   - P2 store ✅ / P3 ai ✅ / P4 skill ✅ / P5 kb ✅ / P6 mcp ✅ / P7 cli ✅ / P8 server ✅ / P9 docs+git ✅
   - **T1 全面测试 ✅（2026-10-16 selftest 扩至 20 块全绿 + e2e/run_e2e.sh 四通道 24 断言全绿；修复小画布 grid 越界 panic；AiProvider 改 pub(open)）**
   - **T2 远期计划 ✅（docs/long-term-plan.md v0.2→v1.0 已交付）**
+  - **T3 v0.2 迭代（进行中，2026-11-03）：KB IDF+bigram、Provider 契约套件、结构化输出自愈 generate_safe；selftest 20→22 块、e2e 24 全绿、build 0w0e；OpenAiCompatProvider 与流式生成因密钥/网络留作下一步**
 - 交付回写（记/锁/回）：
   - ✅ 已交付 P4 skill 模块；下环依赖 P5 kb。
   - ✅ 已交付 P5 kb 模块；下环依赖 P6 mcp。
@@ -21,6 +22,7 @@
   - ✅ 已交付 P9（README/changelog/roadmap + .gitignore + 自检查 + 提交并推送 GitHub）；MoonPot v0.1.0 MVP 全环完成，无遗留。
   - ✅ 已交付 T1 全面测试（selftest [13]-[20] + e2e 24 断言）；下环依赖 T2 远期计划。
   - ✅ 已交付 T2 远期迭代计划（docs/long-term-plan.md）；测试+计划均已随本轮提交推送。
+  - 🔄 进行中 T3 v0.2 迭代：KB 升级（IDF+CJK bigram）+ Provider 契约套件 + 结构化输出自愈；下环依赖 v0.2 收尾（OpenAiCompatProvider 真实 HTTP + 流式生成 SSE/WS）。
 - 变更记录：
   - 2026-10-15 用户追加全局规则（记/锁/回 + 禁止群聊当决定）。
   - 2026-10-16 重建 P4 skill（跨包结构体字面量受限 → 改用 @common 工厂函数）。

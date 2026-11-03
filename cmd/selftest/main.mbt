@@ -26,6 +26,22 @@ impl @ai.AiProvider for FakeProvider with gen(
     ["fake:" + self.tag, "prompt:" + req.prompt])
 }
 
+/// A deliberately broken provider: returns an EMPTY project (no files),
+/// which violates the design contract. Used to prove `generate_safe`
+/// heals back to the Mock provider instead of propagating garbage.
+struct BrokenProvider {}
+
+fn BrokenProvider::new() -> BrokenProvider {
+  BrokenProvider::{}
+}
+
+impl @ai.AiProvider for BrokenProvider with gen(
+  _self : BrokenProvider,
+  req : @ai.GenRequest,
+) -> @ai.GenResult {
+  @ai.gen_result(@common.project("broken", req.name, files=[]), ["broken"])
+}
+
 fn main raise {
   // 1. create / get / list projects
   let s = @store.Store::new()
@@ -402,6 +418,28 @@ fn main raise {
   assert_eq(c4.pages[0].shapes[1].fill, @common.color(99, 102, 241, 1.0))
   assert_eq(c4.pages[0].shapes[2].fill, @common.color(16, 185, 129, 1.0))
   println("[20] render + skill chain ... ok")
+
+  // 21. Provider contract suite: Mock AND Fake satisfy the same gate
+  let mock_fails = @ai.provider_contract(@ai.MockProvider::new(), "MockProvider")
+  assert_true(mock_fails.is_empty())
+  let fake_fails = @ai.provider_contract(FakeProvider::new("c1"), "FakeProvider")
+  assert_true(fake_fails.is_empty())
+  println("[21] provider contract (Mock + Fake) ... ok")
+
+  // 22. Structured-output contract: generate_safe heals a broken provider
+  let broken_req = @ai.gen_request("landing", 800.0, 600.0, "B")
+  let healed = @ai.generate_safe(BrokenProvider::new(), broken_req)
+  // broken provider emitted an empty project -> healed back to Mock design
+  assert_true(@ai.validate_design(healed.project))
+  assert_true(healed.project.files[0].pages[0].shapes.length() >= 1)
+  // Mock path is unaffected by the safeguard (exact same design as direct call)
+  let mock_healed = @ai.generate_safe(@ai.MockProvider::new(), broken_req)
+  let direct = @ai.MockProvider::new().gen(broken_req)
+  assert_eq(
+    mock_healed.project.to_json().stringify(),
+    direct.project.to_json().stringify(),
+  )
+  println("[22] generate_safe self-heal ... ok")
 
   println("ALL STORE + AI + SKILL + KB + MCP + CLI TESTS PASSED")
 }

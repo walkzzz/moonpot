@@ -30,11 +30,12 @@ pub fn doc(id : String, title : String, body : String) -> Doc {
   Doc::{ id, title, body }
 }
 
-/// A built knowledge base: immutable documents + their vectors.
+/// A built knowledge base: immutable documents + their vectors + IDF.
 pub struct KB {
   docs : Array[Doc]
   vocab : Array[String]
   entries : Array[Entry]
+  idf : Array[Double]
 }
 
 // --- Tokenization ---------------------------------------------------------
@@ -64,23 +65,34 @@ fn lower_char(c : Char) -> Char {
 
 /// Deterministic bilingual tokenizer.
 ///   - ASCII letters/digits form lowercase words
-///   - each CJK character becomes its own single-character token
+///   - each CJK character becomes its own unigram token AND every adjacent
+///     CJK pair becomes a bigram token (e.g. "世界" -> 世, 界, 世界)
 ///   - all other characters are separators
 pub fn tokenize(s : String) -> Array[String] {
   let toks : Array[String] = []
   let mut buf = ""
+  let mut prev_cjk = ""
   for c in s {
     if is_cjk(c) {
       if buf.length() > 0 {
         toks.push(buf)
         buf = ""
       }
-      toks.push("\{c}")
+      let cs = "\{c}"
+      toks.push(cs)
+      if prev_cjk.length() > 0 {
+        toks.push(prev_cjk + cs)
+      }
+      prev_cjk = cs
     } else if is_word_char(c) {
+      prev_cjk = ""
       buf = buf + "\{lower_char(c)}"
-    } else if buf.length() > 0 {
-      toks.push(buf)
-      buf = ""
+    } else {
+      if buf.length() > 0 {
+        toks.push(buf)
+        buf = ""
+      }
+      prev_cjk = ""
     }
   }
   if buf.length() > 0 {
@@ -138,6 +150,47 @@ fn sqrt(x : Double) -> Double {
   g
 }
 
+/// Natural logarithm via the ln((1+u)/(1-u)) series, with argument
+/// reduction by powers of two. Dependency-free; accurate to ~1e-9.
+fn ln(x : Double) -> Double {
+  if x <= 0.0 {
+    return 0.0
+  }
+  let mut y = x
+  let mut exp = 0
+  while y > 2.0 {
+    y = y / 2.0
+    exp = exp + 1
+  }
+  while y < 1.0 {
+    y = y * 2.0
+    exp = exp - 1
+  }
+  let u = (y - 1.0) / (y + 1.0)
+  let u2 = u * u
+  let mut term = u
+  let mut sum = 0.0
+  let mut k = 1
+  for i = 0; i < 40; i = i + 1 {
+    sum = sum + term / k.to_double()
+    term = term * u2
+    k = k + 2
+  }
+  sum * 2.0 + exp.to_double() * 0.6931471805599453
+}
+
+/// TF-IDF weighted vector: raw term frequency times the collection IDF.
+fn embed_weighted(
+  text : String, vocab : Array[String], idf : Array[Double]
+) -> Array[Double] {
+  let tf = embed(text, vocab)
+  let v : Array[Double] = []
+  for i = 0; i < vocab.length(); i = i + 1 {
+    v.push(tf[i] * idf[i])
+  }
+  v
+}
+
 fn dot(a : Array[Double], b : Array[Double]) -> Double {
   let mut s = 0.0
   for i = 0; i < a.length(); i = i + 1 {
@@ -158,6 +211,9 @@ fn cosine(a : Array[Double], b : Array[Double]) -> Double {
 // --- Public API -----------------------------------------------------------
 
 /// Build a KB from a set of documents (deterministic vocabulary order).
+/// Computes smooth IDF so a single-document KB degrades to pure TF (no
+/// divide-by-zero / all-zero vectors), while multi-doc KBs discriminate
+/// rare terms from common ones.
 pub fn build(docs : Array[Doc]) -> KB {
   let vocab : Array[String] = []
   for d in docs {
@@ -168,12 +224,28 @@ pub fn build(docs : Array[Doc]) -> KB {
       }
     }
   }
+  let n = docs.length().to_double()
+  let doc_tokens : Array[Array[String]] = []
+  for d in docs {
+    doc_tokens.push(tokenize(d.title + " " + d.body))
+  }
+  let idf : Array[Double] = []
+  for v in vocab {
+    let mut df = 0
+    for dt in doc_tokens {
+      if contains_str(dt, v) {
+        df = df + 1
+      }
+    }
+    // smooth idf: ln((1+N)/(1+df)) + 1  (sklearn "smooth" variant)
+    idf.push(ln((1.0 + n) / (1.0 + df.to_double())) + 1.0)
+  }
   let entries : Array[Entry] = []
   for d in docs {
     let text = d.title + " " + d.body
-    entries.push({ doc: d, vec: embed(text, vocab) })
+    entries.push({ doc: d, vec: embed_weighted(text, vocab, idf) })
   }
-  { docs, vocab, entries }
+  { docs, vocab, entries, idf }
 }
 
 /// Add a document and return a fresh KB (vocabulary may grow).
@@ -188,7 +260,7 @@ pub fn add(kb : KB, doc : Doc) -> KB {
 
 /// Rank documents by cosine similarity to the query, returning top `top_k`.
 pub fn query(kb : KB, q : String, top_k : Int) -> Array[(Doc, Double)] {
-  let qvec = embed(q, kb.vocab)
+  let qvec = embed_weighted(q, kb.vocab, kb.idf)
   let scored : Array[(Doc, Double)] = []
   for e in kb.entries {
     scored.push((e.doc, cosine(qvec, e.vec)))
@@ -234,14 +306,24 @@ pub fn retrieve_context(kb : KB, q : String, top_k : Int) -> String {
 
 // --- Tests ----------------------------------------------------------------
 
-test "tokenize splits ascii words and cjk chars" {
+test "tokenize splits ascii words and cjk chars + bigrams" {
   let t = tokenize("Hello 世界 ABC")
-  // hello, 世, 界, abc
+  // hello, 世, 界, 世界, abc
   assert_true(contains_str(t, "hello"))
   assert_true(contains_str(t, "世"))
   assert_true(contains_str(t, "界"))
+  assert_true(contains_str(t, "世界"))
   assert_true(contains_str(t, "abc"))
-  assert_eq(t.length(), 4)
+  assert_eq(t.length(), 5)
+}
+
+test "tokenize emits adjacent cjk bigrams" {
+  let t = tokenize("世界地图")
+  assert_true(contains_str(t, "世"))
+  assert_true(contains_str(t, "界"))
+  assert_true(contains_str(t, "世界"))
+  assert_true(contains_str(t, "地图"))
+  assert_false(contains_str(t, "界地")) // non-adjacent pair is NOT a token
 }
 
 test "build + query returns the most relevant doc first" {
@@ -273,4 +355,27 @@ test "add grows the knowledge base" {
   let kb0 = build([ { id: "1", title: "x", body: "moonbit" } ])
   let kb1 = add(kb0, { id: "2", title: "y", body: "rust language" })
   assert_eq(kb1.docs.length(), 2)
+}
+
+test "idf down-weights common terms so rare terms win a query" {
+  let docs = [
+    { id: "a", title: "cat cat cat", body: "cat cat cat cat cat" },
+    { id: "b", title: "cat zebra", body: "zebra unique" },
+  ]
+  let kb = build(docs)
+  // "zebra" only appears in doc b -> b must rank first
+  let hits = query(kb, "zebra", 1)
+  assert_eq(hits[0].0.id, "b")
+  // and both docs still score > 0 (no zero-vector degeneration)
+  let all = query(kb, "cat", 2)
+  assert_true(all.length() == 2)
+}
+
+test "add preserves document insertion order" {
+  let kb0 = build([ { id: "1", title: "x", body: "moonbit" } ])
+  let kb1 = add(kb0, { id: "2", title: "y", body: "rust" })
+  assert_eq(kb1.docs[0].id, "1")
+  assert_eq(kb1.docs[1].id, "2")
+  let kb2 = add(kb1, { id: "3", title: "z", body: "go" })
+  assert_eq(kb2.docs[2].id, "3")
 }

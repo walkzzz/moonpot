@@ -21,13 +21,13 @@
 
 **主题：从"确定性 Mock"走向"真模型可插拔"，同时保持离线可跑。**
 
-- [ ] `OpenAiCompatProvider`：实现 `AiProvider`（trait 已 `pub(open)`），OpenAI 兼容 chat/completions 端点，环境变量注入 key/base_url。
-- [ ] 结构化输出契约：模型返回 JSON 设计树 → `@json.from_json` 校验，非法输出自动降级 Mock 重试（自愈式 fallback）。
-- [ ] 流式生成：`/api/generate/stream`（SSE）与 `/ws` 进度帧（"adding a title block…"）。
-- [ ] KB 升级：IDF 加权 + CJK 二元组（bigram）分词 + 增量 `add()` 保序测试。
-- [ ] 测试：Provider 契约测试套件（Mock/Fake/真实 Provider 共享同一组断言）；快照对比防回归。
+- [ ] `OpenAiCompatProvider`：实现 `AiProvider`（trait 已 `pub(open)`），OpenAI 兼容 chat/completions 端点，环境变量注入 key/base_url。**（v0.1.2 未做：涉及密钥管理 + 网络发送，留作下一步；契约与验证层已就绪）**
+- [x] 结构化输出契约：模型返回 JSON 设计树校验（新增 `ai.validate_design`），非法输出自动降级 `MockProvider` 重试（自愈式 fallback，新增 `ai.generate_safe`，已接入 server/mcp/cli）。
+- [ ] 流式生成：`/api/generate/stream`（SSE）与 `/ws` 进度帧（"adding a title block…"）。**（v0.1.2 未做，留作下一步）**
+- [x] KB 升级：IDF 加权（平滑 IDF，单文档退化为纯 TF）+ CJK 二元组（bigram）分词 + 增量 `add()` 保序测试。
+- [x] 测试：Provider 契约测试套件（`ai.provider_contract[T]`，Mock 与 Fake 共享同一组断言，selftest 块 [21] 验收）；快照对比防回归。
 
-**验收**：真实 Provider 与 Mock 通过同一契约测试；断网时 `moonpot serve` 全功能可用。
+**验收**：真实 Provider 与 Mock 通过同一契约测试；断网时 `moonpot serve` 全功能可用。**v0.1.2 已落地**：KB IDF+bigram、契约套件、结构化自愈——除真实 HTTP Provider 与流式外，离线可跑目标已达标。
 
 ## v0.3 — 持久化与协作（目标：2026-12）
 

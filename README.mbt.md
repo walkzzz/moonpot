@@ -85,8 +85,8 @@ curl -s localhost:4000/api/rpc -d '{"jsonrpc":"2.0","id":1,"method":"moonpot/lis
 ## Design notes
 
 - **Storage**: `Store` keeps everything in memory and snapshots to a JSON file via `save_as`/`load_from` — fast, portable, and swap-ready for PostgreSQL/Redis.
-- **AI provider**: `AiProvider` trait with a deterministic `MockProvider` (offline, keyword-driven layout). A hosted LLM provider can implement the same trait.
-- **KB**: bilingual tokenization (ASCII words + CJK single characters), TF bag-of-words vectors, cosine similarity — fully self-contained, no ML runtime needed.
+- **AI provider**: `AiProvider` trait (`pub(open)`) with a deterministic `MockProvider` (offline, keyword-driven layout). Any package can implement the same trait. `provider_contract` is a shared assertion suite every provider must pass; `generate_safe` validates the generated design and self-heals to `MockProvider` if a real LLM emits malformed output.
+- **KB**: bilingual tokenization (ASCII words + CJK unigrams **and** bigrams), TF-IDF vectors with smooth IDF weighting, cosine similarity — fully self-contained, no ML runtime needed.
 - **MCP everywhere**: the single `@mcp.handle(store, text)` dispatcher powers the file-transport server, `POST /api/rpc`, and the `/ws` bridge, so MCP clients can attach over any transport.
 
 ## Testing
@@ -94,7 +94,7 @@ curl -s localhost:4000/api/rpc -d '{"jsonrpc":"2.0","id":1,"method":"moonpot/lis
 MoonPot ships a two-layer, dependency-free test suite:
 
 ```bash
-# Layer 1 — selftest: 20 assertion blocks across every module
+# Layer 1 — selftest: 22 assertion blocks across every module
 moonrun _build/wasm/debug/build/cmd/selftest/selftest.wasm
 # ALL STORE + AI + SKILL + KB + MCP + CLI TESTS PASSED
 
@@ -105,10 +105,11 @@ bash e2e/run_e2e.sh
 
 The selftest covers boundary inputs (empty/keyword-flood/tiny-canvas prompts),
 generation determinism, a `FakeProvider` swap of the open `AiProvider` trait,
-corrupted-snapshot recovery, the full MCP method matrix with JSON-RPC error
-codes, KB edge cases (empty index, topk bounds, CJK queries), CLI error paths,
-500-shape/Unicode/deep-nesting round-trips and HTML escaping. The e2e suite
-asserts all REST endpoints plus 404/400 bodies, a WebSocket JSON-RPC
+the `provider_contract` gate (runs against **both** Mock and Fake), and the
+`generate_safe` self-heal fallback (a broken provider is healed into a valid
+Mock design). KB coverage includes IDF discrimination, CJK bigram tokenization,
+incremental `add()` order preservation, CJK queries and topk bounds. The e2e
+suite asserts all REST endpoints plus 404/400 bodies, a WebSocket JSON-RPC
 round-trip (Node ≥ 22 native WebSocket), the MCP file-transport server and a
 CLI full chain with snapshot persistence.
 

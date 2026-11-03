@@ -12,7 +12,7 @@ pub fn MockProvider::model_name(self : MockProvider) -> String {
   self.model
 }
 
-impl AiProvider for MockProvider with gen(
+pub impl AiProvider for MockProvider with gen(
   self : MockProvider,
   req : GenRequest,
 ) -> GenResult {
